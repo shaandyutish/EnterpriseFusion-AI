@@ -1,0 +1,6 @@
+process_id,step_name,avg_duration,failure_rate,volume,suggested_fix
+WF001,login_validation,2.5,0.12,1500,Add caching layer
+WF002,payment_processing,8.7,0.45,800,Retry mechanism needed
+WF003,order_confirmation,1.2,0.03,1200,None
+WF004,ticket_routing,15.3,0.28,450,AI classification
+WF005,data_ingestion,45,0.67,200,Parallel processing

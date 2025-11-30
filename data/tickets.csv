@@ -1,0 +1,6 @@
+id,customer_id,channel,message,intent,priority,response_time,resolution,sentiment_score
+1,1001,email,My payment failed 3 times,billing,high,120,pending,-0.8
+2,1002,chat,How do I reset password?,faq,low,45,auto_resolved,0.6
+3,1003,ticket,App crashes on login,bug,high,180,pending,-0.9
+4,1004,email,Where is my order?,shipping,medium,90,auto_resolved,0.2
+5,1005,chat,Billing question,billing,medium,60,pending,0.1

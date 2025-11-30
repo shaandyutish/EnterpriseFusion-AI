@@ -1,0 +1,4 @@
+source_id,table_name,row_count,quality_score,last_ingested
+CRM_001,customers,12500,0.87,2025-11-29
+ERP_002,orders,8900,0.72,2025-11-28
+SUPPORT_003,tickets,3400,0.91,2025-11-30

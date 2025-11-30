@@ -1,0 +1,6 @@
+customer_id,segment,past_tickets,preferences,lifetime_value
+1001,premium,12,billing_support,4500
+1002,standard,3,tech_support,1200
+1003,enterprise,25,priority_support,25000
+1004,standard,8,shipping,800
+1005,premium,6,billing_support,3200
