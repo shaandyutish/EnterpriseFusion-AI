@@ -1,15 +1,24 @@
-# config.py
 import os
 from dotenv import load_dotenv
 import google.generativeai as genai
+import logging
 
-# Load variables from .env in project root
+# Load .env
 load_dotenv()
 
-api_key = os.getenv("GEMINI_API_KEY")
-print("CONFIG GEMINI KEY PREFIX:", api_key[:8] if api_key else None)
+# --- Gemini API key ---
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    print("WARNING: GEMINI_API_KEY not set – live Gemini will not work")
 
-genai.configure(api_key=api_key)
+# --- Database path for SQLite ---
+DB_PATH = os.getenv("DB_PATH", "enterprise_fusion.db")
 
-BASE_DIR = os.path.dirname(__file__)
-DB_PATH = os.path.join(BASE_DIR, "data", "enterprise_fusion.db")
+# --- Logging ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("enterprise_fusion")

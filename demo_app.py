@@ -2,6 +2,12 @@ import json
 import streamlit as st
 import pandas as pd
 
+from tools.data_layer import (
+    list_tickets_for_customer,
+    list_data_quality_runs,
+    save_data_quality_run,
+)
+
 from agents.omni_support import omni_support_agent
 from agents.workflow_auditor import workflow_auditor_agent
 from agents.data_guardian import data_guardian_agent
@@ -9,6 +15,7 @@ from orchestrator import EnterpriseFusionOrchestrator
 from evaluation import run_full_evaluation
 from tools.analytics_tools import generate_weekly_report
 from tools.data_tools import init_db
+from config import logger
 
 
 # ---------- Page config & intro ----------
@@ -16,7 +23,7 @@ from tools.data_tools import init_db
 st.set_page_config(page_title="EnterpriseFusion-AI", layout="wide")
 
 st.title("EnterpriseFusion-AI 🚀")
-st.subheader("Kaggle Agents Intensive Capstone - Enterprise Agents Track")
+st.subheader("Enterprise Workflow Intelligence Platform")
 
 st.markdown(
     """
@@ -30,19 +37,22 @@ st.markdown(
 )
 
 st.markdown(
-    '<p class="big-font">Choose a mode below to explore how EnterpriseFusion-AI transforms enterprise workflows using multiple specialized agents.</p>',
+    '<p class="big-font">Use the views below to manage support tickets, audit workflows, and monitor data quality using coordinated AI agents.</p>',
     unsafe_allow_html=True,
 )
 
 # Ensure DB exists (no-op if already created)
 init_db()
 
-# Create orchestrator (if your constructor differs, adjust accordingly)
+# Create orchestrator
 orchestrator = EnterpriseFusionOrchestrator()
+
+
 # ---------- Helper render functions ----------
 
-def show_ticket_demo():
-    st.header("💬 Ticket Demo")
+
+def show_ticket_view():
+    st.header("💬 Ticket Workspace")
 
     col1, col2 = st.columns(2)
 
@@ -61,9 +71,8 @@ def show_ticket_demo():
         sla_hours = st.number_input("SLA (hours)", min_value=1, max_value=72, value=24)
 
     if st.button("Process Ticket"):
-        # Build a single payload dict for the orchestrator
         ticket_payload = {
-            "id": customer_id,          # or a separate ticket_id if you have one
+            "id": customer_id,
             "customer_id": customer_id,
             "message": issue_text,
             "priority": priority,
@@ -72,22 +81,32 @@ def show_ticket_demo():
             "sla_hours": sla_hours,
         }
 
-        with st.spinner("Running omni support agent…"):
+        with st.spinner("Processing ticket with Omni Support Agent…"):
             result = orchestrator.process_ticket(ticket_payload)
 
-        st.subheader("Agent Response")
+        st.subheader("Agent Decision")
         st.json(result)
 
-def show_audit_demo():
-    st.header("📊 Workflow Audit Demo")
+        cust_id = result.get("customer_id")
+        if cust_id:
+            st.markdown("### Recent tickets for this customer")
+            history = list_tickets_for_customer(cust_id, limit=5)
+            if history:
+                df = pd.DataFrame(history)
+                st.dataframe(df)
+            else:
+                st.info("No previous tickets found for this customer.")
+
+
+def show_audit_view():
+    st.header("📊 Workflow Audit")
 
     st.write(
-        "Run a weekly process audit on sample enterprise workflows to detect "
-        "bottlenecks, SLA risks, and automation candidates."
+        "Run a weekly workflow audit to detect bottlenecks, SLA risks, and automation opportunities across your operations."
     )
 
     if st.button("Run Weekly Audit"):
-        with st.spinner("Running workflow auditor…"):
+        with st.spinner("Running Workflow Auditor Agent…"):
             audit_result = orchestrator.run_weekly_audit()
 
         st.subheader("Audit Summary")
@@ -105,7 +124,9 @@ def show_audit_demo():
         autos = audit_result.get("automations", [])
         if autos:
             for a in autos:
-                st.markdown(f"- **{a.get('name','Automation')}** – {a.get('description','')}")
+                st.markdown(
+                    f"- **{a.get('name','Automation')}** – {a.get('description','')}"
+                )
         else:
             st.write("No new automations suggested.")
 
@@ -113,43 +134,85 @@ def show_audit_demo():
         st.json(generate_weekly_report())
 
 
-
-def show_data_demo():
-    st.header("🛡️ Data Demo")
-
-    st.write(
-        "Check data quality and policy compliance on a sample dataset using the "
-        "Data Guardian agent."
-    )
-
-    if st.button("Run Data Quality Check"):
-        with st.spinner("Running data guardian…"):
-            dq_result = orchestrator.check_data()
-
-        st.subheader("Quality Score")
-        st.write(dq_result.get("quality_score", "N/A"))
-
-        st.subheader("Issues")
-        issues = dq_result.get("issues", [])
-        if issues:
-            for issue in issues:
-                st.markdown(f"- **{issue.get('type','Issue')}** – {issue.get('detail','')}")
-        else:
-            st.write("No major issues found.")
-
-        st.subheader("Raw Result")
-        st.json(dq_result)
-
-
-def show_evaluation_demo():
-    st.header("📈 Evaluation")
+def show_data_view():
+    st.header("🛡️ Data Quality")
 
     st.write(
-        "Run the full evaluation suite over curated scenarios to compute the "
-        "overall performance score."
+        "Upload a CSV dataset to run data quality checks and store each run for monitoring."
     )
 
-    if st.button("Run Full Evaluation"):
+    uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
+
+    if uploaded_file is not None:
+        try:
+            df = pd.read_csv(uploaded_file)
+        except Exception as e:
+            st.error(f"Could not read CSV: {e}")
+            logger.exception("CSV read failed in Data Quality view")
+            st.stop()
+
+        st.subheader("Preview")
+        st.dataframe(df.head())
+
+        if df.empty:
+            st.warning("The uploaded CSV is empty. Nothing to analyze.")
+            st.stop()
+
+        row_count = len(df)
+        null_counts = df.isna().sum()
+        total_nulls = int(null_counts.sum())
+        issue_count = total_nulls
+
+        score = max(
+            0.0,
+            1.0 - (issue_count / max(1, row_count * len(df.columns))),
+        )
+
+        result = {
+            "columns": list(df.columns),
+            "row_count": row_count,
+            "null_counts": null_counts.to_dict(),
+            "issue_count": issue_count,
+            "score": score,
+        }
+
+        dataset_name = uploaded_file.name
+        uploaded_by = "demo_user"  # later: real user / email
+
+        try:
+            save_data_quality_run(
+                dataset_name=dataset_name,
+                uploaded_by=uploaded_by,
+                row_count=row_count,
+                issue_count=issue_count,
+                score=score,
+                result=result,
+            )
+            st.success("Data quality run saved to database.")
+        except Exception as e:
+            st.error(f"Failed to save data quality run: {e}")
+            logger.exception("save_data_quality_run failed in Data Quality view")
+
+        st.subheader("Data Quality Summary")
+        st.json(result)
+
+    st.markdown("### Recent Data Quality Runs")
+    runs = list_data_quality_runs(limit=5)
+    if runs:
+        hist_df = pd.DataFrame(runs)
+        st.dataframe(hist_df)
+    else:
+        st.info("No previous data quality runs recorded yet.")
+
+
+def show_evaluation_view():
+    st.header("📈 Evaluation Dashboard")
+
+    st.write(
+        "Run the evaluation suite over curated scenarios to compute the overall performance of your agents."
+    )
+
+    if st.button("Run Evaluation"):
         with st.spinner("Evaluating agents…"):
             eval_result = run_full_evaluation()
 
@@ -162,6 +225,14 @@ def show_evaluation_demo():
             df = pd.DataFrame(
                 [{"dimension": k, "score": v} for k, v in scores.items()]
             )
+
+            # Bar chart for evaluation scores
+            st.bar_chart(
+                df.set_index("dimension")["score"],
+                height=300,
+            )
+
+            # Optional: detailed table under the chart
             st.table(df)
         else:
             st.write("No score details available.")
@@ -170,23 +241,23 @@ def show_evaluation_demo():
         st.json(eval_result)
 
 
-# ---------- Main mode selector (replaces tabs) ----------
+# ---------- Main view selector ----------
 
 mode = st.selectbox(
     "Choose a view",
     [
-        "💬 Ticket Demo",
-        "📊 Audit Demo",
-        "🛡️ Data Demo",
-        "📈 Evaluation",
+        "💬 Ticket Workspace",
+        "📊 Workflow Audit",
+        "🛡️ Data Quality",
+        "📈 Evaluation Dashboard",
     ],
 )
 
-if mode == "💬 Ticket Demo":
-    show_ticket_demo()
-elif mode == "📊 Audit Demo":
-    show_audit_demo()
-elif mode == "🛡️ Data Demo":
-    show_data_demo()
-else:  # "📈 Evaluation"
-    show_evaluation_demo()
+if mode == "💬 Ticket Workspace":
+    show_ticket_view()
+elif mode == "📊 Workflow Audit":
+    show_audit_view()
+elif mode == "🛡️ Data Quality":
+    show_data_view()
+else:  # "📈 Evaluation Dashboard"
+    show_evaluation_view()

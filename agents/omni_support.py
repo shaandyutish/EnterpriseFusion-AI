@@ -69,5 +69,9 @@ def omni_support_agent(ticket_data):
 
     if decision == "ESCALATE_HUMAN":
         result["escalation_reason"] = "Low confidence or high-priority issue"
+        try:
+            create_ticket_from_result(result)
+        except Exception as e:
+            logger.exception("Failed to save ticket to DB")
 
     return result

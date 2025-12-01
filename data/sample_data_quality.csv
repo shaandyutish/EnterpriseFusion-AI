@@ -1,0 +1,6 @@
+﻿customer_id,age,city,email,last_purchase_amount
+1001,28,Delhi,alice@example.com,1200
+1002,,Mumbai,bob@example.com,850
+1003,35,,charlie@example.com,
+1004,48,Bangalore,,2300
+1005,55,Delhi,erin@example.com,NaN
