@@ -5,3 +5,4 @@ __pycache__/
 enterprise_fusion.db
 agent_logs.jsonl
 evaluation_results.json
+.env
