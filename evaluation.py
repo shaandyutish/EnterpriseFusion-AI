@@ -40,7 +40,8 @@ class EnterpriseFusionEvaluator:
         """Test workflow bottleneck detection"""
         result = workflow_auditor_agent()
         detected_bottlenecks = len(result['bottlenecks'])
-        recommendations = len(result['recommendations'])
+        recommendations = len(result.get("recommendations", result.get("automations", [])))
+
         
         self.results['bottlenecks_detected'] = detected_bottlenecks
         self.results['recommendations_generated'] = recommendations

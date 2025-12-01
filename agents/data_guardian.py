@@ -1,84 +1,67 @@
-import google.generativeai as genai
-import pandas as pd
-import numpy as np
-from tools.data_tools import query_unified_store
-from config import GEMINI_API_KEY, GOOGLE_GENAI_MODEL
+# agents/data_guardian.py
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel(GOOGLE_GENAI_MODEL)
+from config import genai
 
-def data_guardian_agent(source_id=None):
-    """Data Guardian Agent - validates and cleans data"""
-    
-    # Query recent data
-    if source_id:
-        query = f"SELECT * FROM unified_data WHERE source_id='{source_id}' ORDER BY ingested_at DESC LIMIT 100"
-    else:
-        query = "SELECT * FROM unified_data ORDER BY ingested_at DESC LIMIT 100"
-    
-    raw_data = query_unified_store(query)
-    
-    if not raw_data:
-        return {"status": "no_data", "quality_score": 0.0}
-    
-    # Simple validation rules
+
+def sample_dataset():
+    """Return a tiny demo dataset for quality checks."""
+    return [
+        {"ticket_id": 1, "sla_hours": 24, "status": "closed"},
+        {"ticket_id": 2, "sla_hours": None, "status": "open"},
+        {"ticket_id": 3, "sla_hours": 48, "status": "closed"},
+    ]
+
+
+def check_basic_quality(data):
+    """Very simple quality metrics over the sample dataset."""
+    total = len(data) or 1
+    null_sla = sum(1 for row in data if row.get("sla_hours") is None)
+
+    quality_score = 1.0 - null_sla / total
+
     issues = []
-    df = pd.DataFrame(raw_data)
-    
-    # Check for missing values
-    missing_rate = df.isnull().mean().mean()
-    if missing_rate > 0.1:
-        issues.append(f"High missing data: {missing_rate:.1%}")
-    
-    # Check duplicates
-    dup_rate = df.duplicated().mean()
-    if dup_rate > 0.05:
-        issues.append(f"High duplicates: {dup_rate:.1%}")
-    
-    # Outlier detection (simple)
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    outlier_score = 0
-    if len(numeric_cols) > 0:
-        for col in numeric_cols:
-            Q1 = df[col].quantile(0.25)
-            Q3 = df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            outliers = ((df[col] < (Q1 - 1.5 * IQR)) | (df[col] > (Q3 + 1.5 * IQR))).mean()
-            outlier_score += outliers
-    
-    quality_score = max(0, 1 - (missing_rate * 0.4 + dup_rate * 0.3 + outlier_score * 0.3))
-    
+    if null_sla:
+        issues.append(
+            {
+                "type": "MissingValues",
+                "detail": f"{null_sla} rows have null sla_hours out of {total}.",
+            }
+        )
+
+    return {"quality_score": quality_score, "issues": issues}
+
+
+def data_guardian_agent(payload=None):
+    """Data Guardian Agent - checks data quality and policy compliance."""
+    data = sample_dataset()
+    basic_checks = check_basic_quality(data)
+
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
+
     prompt = f"""
-    You are Data Guardian Agent. Review this data quality report:
-    
-    Issues: {issues}
-    Quality Score: {quality_score:.2f}
-    Sample data: {raw_data[:3]}
-    
+    You are a data quality and compliance assistant.
+
+    Dataset profile:
+    {basic_checks}
+
     Tasks:
-    1. Prioritize data cleaning actions
-    2. Suggest schema improvements
-    3. Flag critical issues requiring human review
-    
+    1. Rate overall data quality from 0 to 1.
+    2. List key quality issues (missing values, inconsistencies, etc.).
+    3. Flag obvious policy/PII risks if any.
+    4. Suggest 2–3 remediation steps.
+
     Respond as JSON:
     {{
-        "quality_score": {quality_score},
-        "issues": [...],
-        "actions": [...],
-        "human_review_needed": boolean
+        "quality_score": 0.0-1.0,
+        "issues": [{{"type": "...","detail": "..."}}],
+        "recommendations": ["...","..."]
     }}
     """
-    
+
     response = model.generate_content(prompt)
-    
+
     return {
-        "quality_score": quality_score,
-        "issues": issues,
-        "actions": [
-            "Fill missing values with defaults",
-            "Remove duplicates by primary key",
-            "Cap numeric outliers at 3σ"
-        ],
-        "human_review_needed": quality_score < 0.7,
-        "records_checked": len(raw_data)
+        "quality_score": basic_checks.get("quality_score", 0.85),
+        "issues": basic_checks.get("issues", []),
+        "raw_llm_text": getattr(response, "text", None),
     }

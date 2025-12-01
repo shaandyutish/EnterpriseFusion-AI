@@ -1,24 +1,46 @@
-import google.generativeai as genai
-from tools.data_tools import ingest_csv, query_unified_store
-from config import GEMINI_API_KEY, GOOGLE_GENAI_MODEL
+# agents/data_hub_agent.py
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel(GOOGLE_GENAI_MODEL)
+from config import genai
 
-def data_hub_agent(source_data):
-    """Data Hub Agent - ingests and normalizes data"""
-    prompt = f"""
-    You are Data Hub Agent. Process this incoming data source:
-    
-    Source: {source_data}
-    
-    Tasks:
-    1. Identify data type (CSV, JSON, API)
-    2. Call ingest_csv() if CSV
-    3. Return confirmation with record count
-    
-    Available tools: ingest_csv(), query_unified_store()
+
+def data_hub_agent(query):
     """
-    
+    Data Hub Agent – unified data access layer.
+
+    For the demo, this returns a stubbed answer and optionally uses Gemini
+    to rephrase or enrich the response.
+    """
+    # Stubbed internal data lookup – replace with real DB queries later
+    internal_answer = {
+        "ticket_stats": {
+            "total_tickets": 1200,
+            "open_tickets": 85,
+            "high_priority": 23,
+        },
+        "sla": {
+            "breach_rate": 0.07,
+            "avg_resolution_hours": 18,
+        },
+    }
+
+    # Use configured Gemini model
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
+
+    prompt = f"""
+    You are a Data Hub agent for an enterprise support system.
+
+    Internal metrics:
+    {internal_answer}
+
+    User query:
+    {query}
+
+    Provide a concise, manager-friendly answer to the query in 2–3 sentences.
+    """
+
     response = model.generate_content(prompt)
-    return response.text
+
+    return {
+        "raw_data": internal_answer,
+        "answer": getattr(response, "text", None),
+    }

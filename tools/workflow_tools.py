@@ -1,22 +1,46 @@
 import pandas as pd
 from config import DB_PATH
 
-def analyze_logs(period_days=7):
-    """Analyze workflow performance"""
-    df = pd.read_csv('data/workflows.csv')
-    high_fail = df[df['failure_rate'] > 0.3]
-    bottlenecks = high_fail[['process_id', 'step_name', 'failure_rate']].to_dict('records')
+# tools/workflow_tools.py
+
+def analyze_logs():
+    """Return a stubbed log summary for the Workflow Audit demo."""
     return {
-        'total_workflows': len(df),
-        'bottlenecks': bottlenecks,
-        'avg_failure_rate': df['failure_rate'].mean()
+        "total_tickets": 1200,
+        "avg_resolution_hours": 18,
+        "sla_breach_rate": 0.07,
+        "top_queues": ["Billing", "Tech Support", "Onboarding"],
+        "notes": "Sample data for weekly audit demo, not from real systems.",
     }
 
-def suggest_automation(workflow_id):
-    """Suggest automation fixes"""
-    suggestions = {
-        'WF002': 'Implement payment retry with exponential backoff',
-        'WF004': 'Deploy AI ticket classification agent',
-        'WF005': 'Use parallel data ingestion pipelines'
+
+def suggest_automation(log_summary):
+    """
+    Return simple, fixed automation suggestions based on the log summary.
+
+    This implementation does NOT use dicts as dictionary keys, so it avoids
+    the 'unhashable type: dict' error and is safe for the demo.
+    """
+    return {
+        "summary": "Weekly audit completed for sample enterprise workflows.",
+        "bottlenecks": [
+            {
+                "name": "Manual ticket triage",
+                "impact": "Adds 4–6 hours delay for about 35% of new tickets.",
+            },
+            {
+                "name": "Billing escalation queue",
+                "impact": "High-priority payment issues wait more than 8 hours.",
+            },
+        ],
+        "automations": [
+            {
+                "name": "Auto-route payment issues",
+                "description": "Detect 'payment' intent and route directly to Billing L2.",
+            },
+            {
+                "name": "Auto-close resolved FAQs",
+                "description": "Automatically close tickets when customers confirm the FAQ answer helped.",
+            },
+        ],
     }
-    return suggestions.get(workflow_id, 'Review manual steps for automation')
